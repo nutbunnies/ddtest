@@ -11,6 +11,10 @@ import (
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
+func init() {
+	rand.Seed(int64(time.Now().Nanosecond()))
+}
+
 func main() {
 	fmt.Println("Starting tracer")
 	tracer.Start(
@@ -48,13 +52,22 @@ func fakeMiddleware() {
 
 	//return path thru middleware
 	span.SetTag(ext.ResourceName, "/some/{var}") // using chi router so don't have this info until after return from servehttp
-	span.SetTag("request_id", "random-guid")
 	span.SetTag(ext.HTTPCode, "200")
+	fmt.Printf("\n======\nParent span: %v\n\n======\n", span)
 }
 
 func fakeHandler(ctx context.Context) {
-	span, _ := tracer.StartSpanFromContext(ctx, "tracksomething", tracer.SpanType(ext.AppTypeWeb))
+	span, ctx := tracer.StartSpanFromContext(ctx, "tracksomething", tracer.SpanType(ext.AppTypeWeb))
 	defer span.Finish()
 	rand.Seed(int64(time.Now().Nanosecond()))
-	time.Sleep(time.Duration(1*rand.Int63n(5000)) * time.Millisecond)
+	time.Sleep(time.Duration(1*rand.Int63n(2000)) * time.Millisecond)
+	fakeFunc(ctx)
+	fmt.Printf("\n======\nChild span: %v\n\n======\n", span)
+}
+
+func fakeFunc(ctx context.Context) {
+	span, _ := tracer.StartSpanFromContext(ctx, "twolevelsdown", tracer.SpanType(ext.AppTypeCache))
+	defer span.Finish()
+	time.Sleep(time.Duration(1*rand.Int63n(2000)) * time.Millisecond)
+	fmt.Printf("\n======\nGrandChild span: %v\n\n======\n", span)
 }
